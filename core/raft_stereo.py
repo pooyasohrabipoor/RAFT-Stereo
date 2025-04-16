@@ -29,7 +29,7 @@ class RAFTStereo(nn.Module):
         self.cnet = MultiBasicEncoder(output_dim=[args.hidden_dims, context_dims], norm_fn=args.context_norm, downsample=args.n_downsample) # This one extract features and the context_dims is the channel dimmention of feature maps use fro context encoder and hidden_dims is number of channels of feature map used for feature encoder 
         self.update_block = BasicMultiUpdateBlock(self.args, hidden_dims=args.hidden_dims) ## This one is for GRU and based on your hidden_dims we have number of GRU cells per time frame. if hidden_dims=[123,120,90] then we have 3 level of feature maps then we have 3 GRU units per time frame and each unit is for another level of feautre
 
-        self.context_zqr_convs = nn.ModuleList([nn.Conv2d(context_dims[i], args.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.args.n_gru_layers)])  # This line defien input and outputs of GRU which are(z(gamau) = update gate r(gama r) = reset gate q (C(t)) = candidate hidden state input
+        self.context_zqr_convs = nn.ModuleList([nn.Conv2d(context_dims[i], args.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.args.n_gru_layers)])  # This line defines input and outputs of GRU which are(z(gamau) = update gate r(gama r) = reset gate q (C(t)) = candidate hidden state input
 
         if args.shared_backbone:
             self.conv2 = nn.Sequential(
@@ -75,14 +75,15 @@ class RAFTStereo(nn.Module):
 
         # run the context network
         with autocast(enabled=self.args.mixed_precision):
-            if self.args.shared_backbone:
-                *cnet_list, x = self.cnet(torch.cat((image1, image2), dim=0), dual_inp=True, num_layers=self.args.n_gru_layers)
-                fmap1, fmap2 = self.conv2(x).split(dim=0, split_size=x.shape[0]//2)
+            if self.args.shared_backbone:## get the features of right and left image
+                *cnet_list, x = self.cnet(torch.cat((image1, image2), dim=0), dual_inp=True, num_layers=self.args.n_gru_layers) ### x is final feature map of encoder but cnet_list is a tuple like this cnet_list = [(net1, inp1), (net2, inp2), (net3, inp3)]  net is (initial hidden state for the GRU) and inp is (context features that stay fixed through iterations) if we take three different GRU units per ittertaion
+                #torch.cat((image1, image2), dim=0) concatinate two image along their batch so that both images will be fed through encoder at the same time to let sharing weights
+                fmap1, fmap2 = self.conv2(x).split(dim=0, split_size=x.shape[0]//2)  ### get the feature maps of right and left img ( since they are stacked together we split them here)
             else:
                 cnet_list = self.cnet(image1, num_layers=self.args.n_gru_layers)
                 fmap1, fmap2 = self.fnet([image1, image2])
-            net_list = [torch.tanh(x[0]) for x in cnet_list]
-            inp_list = [torch.relu(x[1]) for x in cnet_list]
+            net_list = [torch.tanh(x[0]) for x in cnet_list] # getting nets of different levels of GRU in the same itteration which is the first hidden state of GRU
+            inp_list = [torch.relu(x[1]) for x in cnet_list]# getting Inps of different levels of GRU (context features that are also input of GRU)
 
             # Rather than running the GRU's conv layers on the context features multiple times, we do it once at the beginning 
             inp_list = [list(conv(i).split(split_size=conv.out_channels//3, dim=1)) for i,conv in zip(inp_list, self.context_zqr_convs)]
