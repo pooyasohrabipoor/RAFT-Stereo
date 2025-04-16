@@ -86,8 +86,8 @@ class RAFTStereo(nn.Module):
             inp_list = [torch.relu(x[1]) for x in cnet_list]# getting Inps of different levels of GRU (context features that are also input of GRU)
 
             # Rather than running the GRU's conv layers on the context features multiple times, we do it once at the beginning 
-            inp_list = [list(conv(i).split(split_size=conv.out_channels//3, dim=1)) for i,conv in zip(inp_list, self.context_zqr_convs)]
-
+            inp_list = [list(conv(i).split(split_size=conv.out_channels//3, dim=1)) for i,conv in zip(inp_list, self.context_zqr_convs)] # this takes the input from inp_list and use the corresponding conv from context_zqr_convs the weights of this conv is (wc,wu,wt) which is ebing multiplied to the input (X) only not to the previous hidden state but becasue input stays the same we first compute this weight and later on during updates we compute weights that multiplies to the previous hidden state
+                # so the conv they use here has enough output channels that the out put includes all (wc,wu,wt) so they split it by 3 to get each individually
         if self.args.corr_implementation == "reg": # Default
             corr_block = CorrBlock1D
             fmap1, fmap2 = fmap1.float(), fmap2.float()
