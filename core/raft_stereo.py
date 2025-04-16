@@ -89,7 +89,7 @@ class RAFTStereo(nn.Module):
             inp_list = [list(conv(i).split(split_size=conv.out_channels//3, dim=1)) for i,conv in zip(inp_list, self.context_zqr_convs)] # this takes the input from inp_list and use the corresponding conv from context_zqr_convs the weights of this conv is (wc,wu,wt) which is ebing multiplied to the input (X) only not to the previous hidden state but becasue input stays the same we first compute this weight and later on during updates we compute weights that multiplies to the previous hidden state
                 # so the conv they use here has enough output channels that the out put includes all (wc,wu,wt) so they split it by 3 to get each individually
         if self.args.corr_implementation == "reg": # Default
-            corr_block = CorrBlock1D
+            corr_block = CorrBlock1D         
             fmap1, fmap2 = fmap1.float(), fmap2.float()
         elif self.args.corr_implementation == "alt": # More memory efficient than reg
             corr_block = PytorchAlternateCorrBlock1D
@@ -98,7 +98,7 @@ class RAFTStereo(nn.Module):
             corr_block = CorrBlockFast1D
         elif self.args.corr_implementation == "alt_cuda": # Faster version of alt
             corr_block = AlternateCorrBlock
-        corr_fn = corr_block(fmap1, fmap2, radius=self.args.corr_radius, num_levels=self.args.corr_levels)
+        corr_fn = corr_block(fmap1, fmap2, radius=self.args.corr_radius, num_levels=self.args.corr_levels)  # all I know is takes feature maps and provide corrolation pyramids
 
         coords0, coords1 = self.initialize_flow(net_list[0])
 
@@ -106,7 +106,7 @@ class RAFTStereo(nn.Module):
             coords1 = coords1 + flow_init
 
         flow_predictions = []
-        for itr in range(iters):
+        for itr in range(iters): # do the iterations ( iters is max of time=t) and update_block takes input and previous hidden state of GRU and give you new hidden state(nnet_list) and new dis map(delta_flow) and then upsampling 
             coords1 = coords1.detach()
             corr = corr_fn(coords1) # index correlation volume
             flow = coords1 - coords0
