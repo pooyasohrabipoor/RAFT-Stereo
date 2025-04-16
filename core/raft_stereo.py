@@ -29,7 +29,7 @@ class RAFTStereo(nn.Module):
         self.cnet = MultiBasicEncoder(output_dim=[args.hidden_dims, context_dims], norm_fn=args.context_norm, downsample=args.n_downsample) # This one extract features and the context_dims is the channel dimmention of feature maps use fro context encoder and hidden_dims is number of channels of feature map used for feature encoder 
         self.update_block = BasicMultiUpdateBlock(self.args, hidden_dims=args.hidden_dims) ## This one is for GRU and based on your hidden_dims we have number of GRU cells per time frame. if hidden_dims=[123,120,90] then we have 3 level of feature maps then we have 3 GRU units per time frame and each unit is for another level of feautre
 
-        self.context_zqr_convs = nn.ModuleList([nn.Conv2d(context_dims[i], args.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.args.n_gru_layers)])
+        self.context_zqr_convs = nn.ModuleList([nn.Conv2d(context_dims[i], args.hidden_dims[i]*3, 3, padding=3//2) for i in range(self.args.n_gru_layers)])  # This line defien input and outputs of GRU which are(z(gamau) = update gate r(gama r) = reset gate q (C(t)) = candidate hidden state input
 
         if args.shared_backbone:
             self.conv2 = nn.Sequential(
@@ -52,7 +52,7 @@ class RAFTStereo(nn.Module):
 
         return coords0, coords1
 
-    def upsample_flow(self, flow, mask):
+    def upsample_flow(self, flow, mask): # flow filed = disparity map and here this function tries to upsample disparity map but with 3x3 kernels with learnable weights
         """ Upsample flow field [H/8, W/8, 2] -> [H, W, 2] using convex combination """
         N, D, H, W = flow.shape
         factor = 2 ** self.args.n_downsample
